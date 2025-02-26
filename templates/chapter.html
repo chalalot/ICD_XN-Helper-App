@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Disease Selection</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- jQuery for AJAX -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+</head>
+<style>
+    /* General Styling */
+    body {
+        background-color: #f8f9fa;
+        font-family: 'Arial', sans-serif;
+    }
+    
+    /* Headings */
+    h1, h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #343a40;
+    }
+    
+    /* Dropdown Styling */
+    label {
+        font-weight: bold;
+    }
+    select {
+        width: 100%;
+        max-width: 400px;
+        padding: 10px;
+        border-radius: 5px;
+        border: 1px solid #007bff;
+        margin: 10px auto;
+        display: block;
+    }
+    
+    /* Buttons */
+    button {
+        display: inline-block;
+        margin: 10px;
+        padding: 10px 15px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 5px;
+        border: none;
+        transition: all 0.3s;
+    }
+    button#selectAll {
+        background-color: #28a745;
+        color: white;
+    }
+    button#selectAll:hover {
+        background-color: #218838;
+    }
+    button#deselectAll {
+        background-color: #dc3545;
+        color: white;
+    }
+    button#deselectAll:hover {
+        background-color: #c82333;
+    }
+    button#confirmSelection {
+        background-color: #007bff;
+        color: white;
+    }
+    button#confirmSelection:hover {
+        background-color: #0056b3;
+    }
+    
+    /* Common Tests Section */
+    #commonTestsContainer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+    .test-card {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        margin: 10px;
+        min-width: 200px;
+    }
+    .btn-remove {
+        background-color: #dc3545;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        border: none;
+        font-size: 14px;
+    }
+    .btn-remove:hover {
+        background-color: #c82333;
+    }
+    
+    /* Table Styling */
+    .table-container {
+        margin-top: 30px;
+    }
+    .compact-table {
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .table thead {
+        background-color: #007bff;
+        color: white;
+    }
+    .table tbody tr:hover {
+        background-color: #e9ecef;
+    }
+    /* Navbar Styling */
+        .navbar {
+            background-color: #007bff;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 24px;
+        }
+        .navbar-brand img {
+            height: 40px;
+            margin-right: 10px;
+        }
+</style>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                 ICD-XN Tool
+            </a>
+        </div>
+    </nav>
+    <h1>Select Disease Information</h1>
+
+    <!-- Disease Chapter Dropdown -->
+    <label for="chapter">Choose a Disease Chapter:</label>
+    <select name="chapter" id="chapter">
+        <option value="">-- Select Chapter --</option>
+        {% for chapter in disease_chapters %}
+            <option value="{{ chapter }}">{{ chapter }}</option>
+        {% endfor %}
+    </select>
+    <h2>Commonly Shared Tests</h2>
+        <div id="commonTestsContainer" class="row"></div>
+    <h1>Suggested Medical Tests</h1>
+    
+    <button id="selectAll">Select All</button>
+    <button id="deselectAll">Deselect All</button>
+
+    <table id="testTable" class="display">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Test Code</th>
+                <th>Test Name</th>
+                <th>Test Type</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <button id="confirmSelection">Confirm</button>
+    <script>
+        $(document).ready(function () {
+            $("#chapter").change(function () {
+                let selectedChapter = $(this).val();
+    
+                if (selectedChapter) {
+                    $.ajax({
+                        url: "/get_common_xns",
+                        type: "POST",
+                        contentType: "application/json",
+                        data: JSON.stringify({ chapter: selectedChapter }),
+                        success: function (data) {
+                            console.log("✅ Common Tests:", data.tests);
+                            $("#commonTestsContainer").empty();  // Clear previous data
+    
+                            if (data.tests !== "No common tests found") {
+                                let testsArray = data.tests.split(", ");
+                                testsArray.forEach(function (test) {
+                                    let cardHtml = `
+                                        <div class="col-md-3">
+                                            <div class="card shadow-sm p-3 mb-3">
+                                                <div class="card-body text-center">
+                                                    <h5 class="card-title">${test}</h5>
+                                                    <button class="btn btn-danger remove-xn" data-test="${test}">
+                                                        ➖ Remove
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    `;
+                                    $("#commonTestsContainer").append(cardHtml);
+                                });
+                            } else {
+                                $("#commonTestsContainer").append("<p>No common tests found.</p>");
+                            }
+                        }
+                    });
+                } else {
+                    $("#commonTestsContainer").empty().append("<p>Select a chapter to see common tests...</p>");
+                }
+            });
+    
+            // Remove a test when clicking the "➖" button
+            $(document).on("click", ".remove-xn", function () {
+                let selectedChapter = $("#chapter").val();
+                let xnNameToRemove = $(this).data("test");
+    
+                if (!selectedChapter) {
+                    alert("Please select a Disease Chapter first!");
+                    return;
+                }
+    
+                $.ajax({
+                    url: "/remove_xn_from_chapter",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        chapter: selectedChapter,
+                        xn_name: xnNameToRemove
+                    }),
+                    success: function (response) {
+                        alert(response.message);
+                        $("#chapter").trigger("change");  // Refresh the common tests
+                    },
+                    error: function () {
+                        alert("Error removing the test.");
+                    }
+                });
+            });
+        });
+    </script>
+    
+    <script>
+        $(document).ready(function () {
+            let selectedChapter = ""; // Store the selected ICD chapter
+
+            // Capture the selected ICD chapter
+            $("#chapter").change(function () {
+                selectedChapter = $(this).val();
+            });
+        
+            
+            // When "Confirm" is clicked, update the ICD_XN table
+            $("#confirmSelection").click(function () {
+                let selectedTests = [];
+                
+                $(".test-checkbox:checked").each(function () {
+                    selectedTests.push($(this).val()); // Collect selected XN IDs
+                });
+
+                if (!selectedChapter) {
+                    alert("Please select a Disease Chapter before confirming.");
+                    return;
+                }
+
+                if (selectedTests.length === 0) {
+                    alert("Please select at least one test.");
+                    return;
+                }
+
+                // Send data to Flask backend
+                $.ajax({
+                    url: "/update_icd_xn",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        chapter: selectedChapter,
+                        test_ids: selectedTests
+                    }),
+                    success: function (response) {
+                        alert(response.message);
+                    },
+                    error: function () {
+                        alert("Error updating the database.");
+                    }
+                });
+            });
+
+        });
+        
+    </script>
+
+    <script>
+    
+        $(document).ready(function () {
+            let table = $('#testTable').DataTable({
+                "ajax": {
+                    "url": "/get_tests",
+                    "dataSrc": function (json) {
+                        console.log("Fetched data:", json); // Log the fetched data
+                        debugger; // Pause execution to inspect the data
+
+                        // Inspect the structure of the JSON object
+                        if (Array.isArray(json)) {
+                            json.forEach((item, index) => {
+                                console.log(`Item ${index}:`, item);
+                            });
+                        } else {
+                            console.log("JSON is not an array:", json);
+                        }
+
+                        return json;
+                    }
+                },
+                "columns": [
+                    {
+                        "data": "id",
+                        "render": function (data, type, row) {
+                            console.log("Row data:", row); // Log each row's data
+                            return `<input type="checkbox" class="test-checkbox" value="${data}">`;
+                        }
+                    },
+                    { "data": "XN Chapter", "title": "Chapter" },
+                    { "data": "XN Group", "title": "Group" },
+                    { "data": "XN Name", "title": "Name" },
+                    { "data": "XN Occurence", "title": "Occurrence" }
+                ],
+                "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]] // Add option to show all records
+            });
+
+            // Select All Functionality
+            $("#selectAll").click(function () {
+                $(".test-checkbox").prop("checked", true);
+            });
+
+            // Deselect All Functionality
+            $("#deselectAll").click(function () {
+                $(".test-checkbox").prop("checked", false);
+            });
+        });
+    </script>
+</body>
+</html>

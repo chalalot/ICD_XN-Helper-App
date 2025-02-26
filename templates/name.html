@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Disease Selection</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script> <!-- jQuery for AJAX -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/jquery.dataTables.min.css">
+    <script src="https://cdn.datatables.net/1.11.5/js/jquery.dataTables.min.js"></script>
+</head>
+<style>
+    /* General Styling */
+    body {
+        background-color: #f8f9fa;
+        font-family: 'Arial', sans-serif;
+    }
+    
+    /* Headings */
+    h1, h2 {
+        text-align: center;
+        margin-bottom: 20px;
+        color: #343a40;
+    }
+    
+    /* Disease Table Styling */
+    #diseaseTable {
+        margin: 20px auto;
+        width: 80%;
+        border-radius: 5px;
+        overflow: hidden;
+    }
+    #diseaseTable tbody tr {
+        cursor: pointer;
+    }
+    #diseaseTable tbody tr:hover {
+        background-color: #e9ecef;
+    }
+    #diseaseTable tbody tr.table-primary {
+        background-color: #007bff !important;
+        color: white;
+    }
+    
+    /* Selected Disease Display */
+    p strong {
+        font-size: 18px;
+        color: #007bff;
+    }
+    #selectedDiseaseDisplay {
+        font-size: 18px;
+        font-weight: bold;
+        color: #dc3545;
+    }
+    
+    /* Buttons */
+    button {
+        display: inline-block;
+        margin: 10px;
+        padding: 10px 15px;
+        font-size: 16px;
+        font-weight: bold;
+        border-radius: 5px;
+        border: none;
+        transition: all 0.3s;
+    }
+    button#selectAll {
+        background-color: #28a745;
+        color: white;
+    }
+    button#selectAll:hover {
+        background-color: #218838;
+    }
+    button#deselectAll {
+        background-color: #dc3545;
+        color: white;
+    }
+    button#deselectAll:hover {
+        background-color: #c82333;
+    }
+    button#confirmSelection {
+        background-color: #007bff;
+        color: white;
+    }
+    button#confirmSelection:hover {
+        background-color: #0056b3;
+    }
+    
+    /* Associated Tests Section */
+    #associatedTestsContainer {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        margin-bottom: 30px;
+    }
+    .test-card {
+        background-color: #ffffff;
+        border-radius: 8px;
+        padding: 15px;
+        box-shadow: 0px 2px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+        margin: 10px;
+        min-width: 200px;
+    }
+    .btn-remove {
+        background-color: #dc3545;
+        color: white;
+        padding: 5px 10px;
+        border-radius: 5px;
+        cursor: pointer;
+        border: none;
+        font-size: 14px;
+    }
+    .btn-remove:hover {
+        background-color: #c82333;
+    }
+    
+    /* Table Styling */
+    .table-container {
+        margin-top: 30px;
+    }
+    .compact-table {
+        width: 100%;
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    .table thead {
+        background-color: #007bff;
+        color: white;
+    }
+    .table tbody tr:hover {
+        background-color: #e9ecef;
+    }
+    /* Navbar Styling */
+        .navbar {
+            background-color: #007bff;
+        }
+        .navbar-brand {
+            font-weight: bold;
+            font-size: 24px;
+        }
+        .navbar-brand img {
+            height: 40px;
+            margin-right: 10px;
+        }
+</style>
+<body>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark">
+        <div class="container">
+            <a class="navbar-brand" href="{{ url_for('index') }}">
+                 ICD-XN Tool
+            </a>
+        </div>
+    </nav>
+    <h1>Select Disease Information</h1>
+
+    <!-- Disease name Dropdown -->
+    <h2>Choose a Disease Name</h2>
+        <input type="hidden" id="selectedDiseaseName" name="name">  <!-- Hidden input to store selection -->
+
+        <table id="diseaseTable" class="display compact table table-striped table-bordered">
+            <thead>
+                <tr>
+                    <th>Disease Name</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for name in disease_names %}
+                <tr class="selectable-row">
+                    <td>{{ name }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <p><strong>Selected Disease:</strong> <span id="selectedDiseaseDisplay">None</span></p>
+
+        <h2>Associated Tests for Selected Disease</h2>
+        <div id="associatedTestsContainer" class="row"></div>
+        
+    <h1>Suggested Medical Tests</h1>
+    
+    <button id="selectAll">Select All</button>
+    <button id="deselectAll">Deselect All</button>
+
+    <table id="testTable" class="display">
+        <thead>
+            <tr>
+                <th>Select</th>
+                <th>Test Code</th>
+                <th>Test Name</th>
+                <th>Test Type</th>
+                <th>Description</th>
+            </tr>
+        </thead>
+        <tbody>
+        </tbody>
+    </table>
+    <button id="confirmSelection">Confirm</button>
+    <script>
+        $(document).ready(function () {
+            let diseaseTable = $('#diseaseTable').DataTable({
+                "paging": true,       // Enable pagination
+                "searching": true,    // Enable search box
+                "info": false,        // Hide table info
+                "lengthMenu": [5, 10, 20],  // Control number of visible rows
+                "autoWidth": false,
+                "responsive": true
+            });
+    
+            // Handle Row Click for Disease Selection
+            $('#diseaseTable tbody').on('click', 'tr', function () {
+                let selectedDisease = $(this).find('td').text();  // Get clicked disease name
+                $("#selectedDiseaseName").val(selectedDisease);   // Store in hidden input
+                $("#selectedDiseaseDisplay").text(selectedDisease); // Update UI
+                
+                // Highlight selected row
+                $('#diseaseTable tbody tr').removeClass('table-primary');  // Remove highlight from all
+                $(this).addClass('table-primary');  // Highlight selected row
+            });
+        });
+    </script>
+    <script>
+        $(document).ready(function () {
+            let selectedDisease = ""; // Store the selected disease name
+    
+            // Fetch Associated Tests for Selected Disease
+            $('#diseaseTable tbody').on('click', 'tr', function () {
+                selectedDisease = $(this).find('td').text();  // Get clicked disease name
+                $("#selectedDiseaseName").val(selectedDisease);   // Store in hidden input
+                $("#selectedDiseaseDisplay").text(selectedDisease); // Update UI
+                
+                // Highlight selected row
+                $('#diseaseTable tbody tr').removeClass('table-primary');  // Remove highlight from all
+                $(this).addClass('table-primary');  // Highlight selected row
+    
+                // Fetch associated tests
+                $.ajax({
+                    url: "/get_xns_for_disease",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({ name: selectedDisease }),
+                    success: function (data) {
+                        console.log("✅ Associated Tests:", data.tests);
+                        $("#associatedTestsContainer").empty();  // Clear previous data
+    
+                        if (Array.isArray(data.tests) && data.tests.length > 0) {
+                            data.tests.forEach(function (test) {
+                                let cardHtml = `
+                                    <div class="col-md-3">
+                                        <div class="card shadow-sm p-3 mb-3">
+                                            <div class="card-body text-center">
+                                                <h5 class="card-title">${test}</h5>
+                                                <button class="btn btn-danger remove-xn" data-test="${test}">
+                                                    ➖ Remove
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                `;
+                                $("#associatedTestsContainer").append(cardHtml);
+                            });
+                        } else {
+                            $("#associatedTestsContainer").append("<p>No associated tests found.</p>");
+                        }
+                    }
+                });
+            });
+    
+            // Remove a test when clicking the "➖" button
+            $(document).on("click", ".remove-xn", function () {
+                let xnNameToRemove = $(this).data("test");
+    
+                if (!selectedDisease) {
+                    alert("Please select a Disease first!");
+                    return;
+                }
+    
+                $.ajax({
+                    url: "/remove_xn_from_disease",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        name: selectedDisease,
+                        xn_name: xnNameToRemove
+                    }),
+                    success: function (response) {
+                        alert(response.message);
+                        $("#diseaseTable tbody tr.table-primary").trigger("click");  // Refresh the tests
+                    },
+                    error: function () {
+                        alert("Error removing the test.");
+                    }
+                });
+            });
+        });
+    </script>
+    
+    <script>
+        $(document).ready(function () {
+            let selectedname = ""; // Store the selected ICD name
+        
+            // Capture the selected ICD name when a table row is clicked
+            $('#diseaseTable tbody').on('click', 'tr', function () {
+                selectedname = $(this).find('td').text();  // Update selected name
+                $("#selectedDiseaseName").val(selectedname);   // Store in hidden input
+                $("#selectedDiseaseDisplay").text(selectedname); // Update UI
+        
+                // Highlight selected row
+                $('#diseaseTable tbody tr').removeClass('table-primary');  
+                $(this).addClass('table-primary');
+            });
+        
+            // When "Confirm" is clicked, update the ICD_XN table
+            $("#confirmSelection").click(function () {
+                let selectedTests = [];
+                
+                $(".test-checkbox:checked").each(function () {
+                    selectedTests.push($(this).val()); // Collect selected XN IDs
+                });
+        
+                if (!selectedname) {  // Now selectedname should have the value from table row selection
+                    alert("Please select a Disease name before confirming.");
+                    return;
+                }
+        
+                if (selectedTests.length === 0) {
+                    alert("Please select at least one test.");
+                    return;
+                }
+        
+                // Send data to Flask backend
+                $.ajax({
+                    url: "/update_icd_xn_name",
+                    type: "POST",
+                    contentType: "application/json",
+                    data: JSON.stringify({
+                        name: selectedname,  // Now it will pass the correct value
+                        test_ids: selectedTests
+                    }),
+                    success: function (response) {
+                        alert(response.message);
+                    },
+                    error: function () {
+                        alert("Error updating the database.");
+                    }
+                });
+            });
+        });
+        
+        
+    </script>
+
+    <script>
+    
+        $(document).ready(function () {
+            let table = $('#testTable').DataTable({
+                "ajax": {
+                    "url": "/get_tests",
+                    "dataSrc": function (json) {
+                        console.log("Fetched data:", json); // Log the fetched data
+                        debugger; // Pause execution to inspect the data
+
+                        // Inspect the structure of the JSON object
+                        if (Array.isArray(json)) {
+                            json.forEach((item, index) => {
+                                console.log(`Item ${index}:`, item);
+                            });
+                        } else {
+                            console.log("JSON is not an array:", json);
+                        }
+
+                        return json;
+                    }
+                },
+                "columns": [
+                    {
+                        "data": "id",
+                        "render": function (data, type, row) {
+                            console.log("Row data:", row); // Log each row's data
+                            return `<input type="checkbox" class="test-checkbox" value="${data}">`;
+                        }
+                    },
+                    { "data": "XN Chapter", "title": "Chapter" },
+                    { "data": "XN Group", "title": "Group" },
+                    { "data": "XN Name", "title": "Name" },
+                    { "data": "XN Occurence", "title": "Occurrence" }
+                ],
+                "lengthMenu": [[10, 25, 50, -1], [10, 25, 50, "All"]] // Add option to show all records
+            });
+
+            // Select All Functionality
+            $("#selectAll").click(function () {
+                $(".test-checkbox").prop("checked", true);
+            });
+
+            // Deselect All Functionality
+            $("#deselectAll").click(function () {
+                $(".test-checkbox").prop("checked", false);
+            });
+        });
+    </script>
+</body>
+</html>
